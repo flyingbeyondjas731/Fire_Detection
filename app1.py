@@ -1,14 +1,40 @@
 import streamlit as st
 import numpy as np
-try:
-    import joblib
-except:
-    st.warning("Joblib not found. This is a demo version without model predictions.")
+import joblib
+import gdown
+import os
 
-# Load model and scaler
-model = joblib.load("best_fire_detection_model.pkl")
-scaler = joblib.load("scaler.pkl")
+# File IDs from Google Drive
+model_file_id = "1K-CkomnFCIaZVmTCCGRVR1wG75_54EZU"
+model_filename = "best_fire_detection_model.pkl"
+scaler_filename = "scaler.pkl"
 
+# Download model from Google Drive if not present
+if not os.path.exists(model_filename):
+    model_url = f"https://drive.google.com/uc?id={model_file_id}"
+    gdown.download(model_url, model_filename, quiet=False)
+
+# Load model
+model = joblib.load(model_filename)
+
+# Load scaler (must be present in the same folder or also use gdown if needed)
+if os.path.exists(scaler_filename):
+    scaler = joblib.load(scaler_filename)
+else:
+    st.warning("Scaler file not found. Please upload scaler.pkl to the same folder.")
+    scaler = None
+
+# Example Streamlit content
+st.title("🔥 Fire Detection App")
+
+st.write("This is a demo of a deployed fire detection model using Streamlit.")
+
+# Optional input section (adjust as needed)
+# if scaler is not None:
+#     user_input = st.text_input("Enter sample values...")
+#     processed_input = scaler.transform([user_input])
+#     prediction = model.predict(processed_input)
+#     st.write(f"Prediction: {prediction}")
 # Set page title
 st.set_page_config(page_title="Fire Type Classifier", layout="centered")
 
