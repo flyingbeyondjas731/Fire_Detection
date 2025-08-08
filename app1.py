@@ -1,6 +1,9 @@
 import streamlit as st
 import numpy as np
-import joblib
+try:
+    import joblib
+except:
+    st.warning("Joblib not found. This is a demo version without model predictions.")
 
 # Load model and scaler
 model = joblib.load("best_fire_detection_model.pkl")
