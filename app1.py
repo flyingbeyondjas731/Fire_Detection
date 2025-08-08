@@ -3,7 +3,7 @@ import numpy as np
 import joblib
 
 # Load model and scaler
-# model = joblib.load("best_fire_detection_model.pkl")
+model = joblib.load("best_fire_detection_model.pkl")
 scaler = joblib.load("scaler.pkl")
 
 # Set page title
@@ -31,7 +31,7 @@ scaled_input = scaler.transform(input_data)
 
 # Predict and display
 if st.button("Predict Fire Type"):
-    #prediction = model.predict(scaled_input)[0]
+    prediction = model.predict(scaled_input)[0]
 
     fire_types = {
         0: "Vegetation Fire",
