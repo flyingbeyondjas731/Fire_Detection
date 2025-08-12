@@ -4,40 +4,42 @@ import joblib
 import gdown
 import os
 import plotly.graph_objects as go
-from datetime import datetime
 
-# ===================== CUSTOM CSS =====================
+# ====== CUSTOM CSS ======
 st.markdown("""
-    <style>
-        body {
-            background: linear-gradient(135deg, #e3f2fd, #fce4ec);
-            font-family: 'Segoe UI', sans-serif;
-        }
-        .main {
-            padding: 2rem;
-            border-radius: 20px;
-        }
-        .stButton>button {
-            background-color: #42a5f5;
-            color: white;
-            border-radius: 12px;
-            padding: 0.6em 1.5em;
-            font-size: 1rem;
-            border: none;
-        }
-        .stButton>button:hover {
-            background-color: #1e88e5;
-        }
-        .prediction-card {
-            background-color: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-    </style>
+<style>
+body {
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    color: white;
+    font-family: 'Segoe UI', sans-serif;
+}
+.stApp {
+    background: transparent;
+}
+.card {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 30px rgba(0,0,0,0.2);
+    margin-bottom: 20px;
+}
+h1, h2, h3 {
+    color: #FFD700;
+}
+.stButton>button {
+    background-color: #FFD700;
+    color: black;
+    border-radius: 12px;
+    font-weight: bold;
+}
+.stButton>button:hover {
+    background-color: #FFC300;
+}
+</style>
 """, unsafe_allow_html=True)
 
-# ===================== MODEL LOADING =====================
+# ====== Download model ======
 file_id = "1K-CkomnFCIaZVmTCCGRVR1wG75_54EZU"
 model_filename = "best_fire_detection_model.pkl"
 
@@ -45,77 +47,79 @@ if not os.path.exists(model_filename):
     st.write("📥 Downloading model from Google Drive...")
     gdown.download(f"https://drive.google.com/uc?id={file_id}", model_filename, quiet=False)
 
+# ====== Load model & scaler ======
 model = joblib.load(model_filename)
 scaler = joblib.load("scaler.pkl")
 
-# ===================== APP CONFIG =====================
-st.set_page_config(page_title="🔥 Fire Type Classifier", layout="wide")
-st.title("🔥 Fire Type Classification Dashboard")
-st.markdown("A stylish, interactive tool to predict **fire type** from MODIS satellite readings.")
+# ====== App Title ======
+st.title("🔥 Fire Type Classification")
+st.markdown("Predict fire type from MODIS satellite readings — now with style!")
 
-# ===================== PRESET DATA =====================
-example_inputs = {
-    "Vegetation Fire": [320, 300, 25, 1.2, 1.1, "nominal"],
-    "Other Static Land Source": [290, 280, 5, 1.0, 1.0, "low"],
-    "Offshore Fire": [310, 295, 40, 1.5, 1.3, "high"]
+# ====== Preset Buttons ======
+preset_values = {
+    "Vegetation Fire": [330, 300, 20, 1.2, 1.0, "high"],
+    "Static Land": [280, 275, 5, 0.5, 0.5, "low"],
+    "Offshore Fire": [350, 320, 50, 2.0, 1.5, "nominal"]
 }
 
-logs = []
-
-# ===================== SIDEBAR PRESETS =====================
-st.sidebar.header("⚡ Quick Presets")
-preset_choice = st.sidebar.selectbox("Choose Example", ["Custom"] + list(example_inputs.keys()))
-if preset_choice != "Custom":
-    brightness, bright_t31, frp, scan, track, confidence = example_inputs[preset_choice]
+preset_choice = st.radio("🔹 Quick Test Presets:", list(preset_values.keys()))
+if st.button("Load Preset"):
+    vals = preset_values[preset_choice]
+    brightness, bright_t31, frp, scan, track, conf = vals
 else:
-    brightness, bright_t31, frp, scan, track, confidence = 300.0, 290.0, 15.0, 1.0, 1.0, "nominal"
+    brightness, bright_t31, frp, scan, track, conf = 300.0, 290.0, 15.0, 1.0, 1.0, "low"
 
-# ===================== USER INPUT =====================
+# ====== Inputs ======
+st.markdown("<div class='card'>", unsafe_allow_html=True)
+brightness = st.number_input("Brightness", value=brightness)
+bright_t31 = st.number_input("Brightness T31", value=bright_t31)
+frp = st.number_input("Fire Radiative Power (FRP)", value=frp)
+scan = st.number_input("Scan", value=scan)
+track = st.number_input("Track", value=track)
+confidence = st.selectbox("Confidence Level", ["low", "nominal", "high"], index=["low","nominal","high"].index(conf))
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ====== Prediction ======
 confidence_map = {"low": 0, "nominal": 1, "high": 2}
+confidence_val = confidence_map[confidence]
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    brightness = st.number_input("Brightness", value=brightness)
-    frp = st.number_input("FRP (Fire Radiative Power)", value=frp)
-with col2:
-    bright_t31 = st.number_input("Brightness T31", value=bright_t31)
-    scan = st.number_input("Scan", value=scan)
-with col3:
-    track = st.number_input("Track", value=track)
-    confidence = st.selectbox("Confidence Level", ["low", "nominal", "high"], index=list(confidence_map.keys()).index(confidence))
+input_data = np.array([[brightness, bright_t31, frp, scan, track, confidence_val]])
+scaled_input = scaler.transform(input_data)
 
-# ===================== PREDICTION =====================
-if st.button("🚀 Predict Fire Type"):
-    input_data = np.array([[brightness, bright_t31, frp, scan, track, confidence_map[confidence]]])
-    scaled_input = scaler.transform(input_data)
-    prediction = model.predict(scaled_input)[0]
-    fire_types = {0: "🌿 Vegetation Fire", 2: "🏭 Other Static Land Source", 3: "🌊 Offshore Fire"}
-    result = fire_types.get(prediction, "❓ Unknown")
+if st.button("🔮 Predict Fire Type"):
+    prediction = int(model.predict(scaled_input)[0])
+    fire_types = {0: "Vegetation Fire", 2: "Other Static Land Source", 3: "Offshore Fire"}
+    result = fire_types.get(prediction, "Unknown")
+    st.success(f"**Predicted Fire Type:** {result}")
 
-    # Log entry
-    logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] Predicted: {result} | Inputs: {list(input_data[0])}")
+    # Debug Info
+    with st.expander("🔍 Debug Info"):
+        st.write("Raw model output:", prediction)
+        st.write("Scaled input:", scaled_input)
 
-    # Show prediction card
-    st.markdown(f"<div class='prediction-card'><h3>Predicted Fire Type: {result}</h3></div>", unsafe_allow_html=True)
-
-    # Radar Chart
+    # ====== Radar Chart ======
+    fig = go.Figure()
     categories = ["Brightness", "Brightness T31", "FRP", "Scan", "Track", "Confidence"]
-    values = [brightness, bright_t31, frp, scan, track, confidence_map[confidence]]
-    fig_radar = go.Figure(data=go.Scatterpolar(r=values + [values[0]], theta=categories + [categories[0]], fill='toself', name='Your Input'))
-    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True)), showlegend=False, height=400)
-    st.plotly_chart(fig_radar, use_container_width=True)
+    fig.add_trace(go.Scatterpolar(
+        r=[brightness, bright_t31, frp, scan, track, confidence_val],
+        theta=categories,
+        fill='toself',
+        name='Input Features'
+    ))
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True)),
+        showlegend=False,
+        template="plotly_dark"
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Gauge Chart for FRP
-    fig_gauge = go.Figure(go.Indicator(
+    # ====== FRP Gauge ======
+    gauge_fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=frp,
         title={'text': "FRP Intensity"},
-        gauge={'axis': {'range': [0, 100]}}
+        gauge={'axis': {'range': [None, 100]},
+               'bar': {'color': "orange"}}
     ))
-    fig_gauge.update_layout(height=300)
-    st.plotly_chart(fig_gauge, use_container_width=True)
-
-# ===================== LOGS PANEL =====================
-with st.expander("📜 Prediction Logs"):
-    for log in logs:
-        st.write(log)
+    gauge_fig.update_layout(template="plotly_dark")
+    st.plotly_chart(gauge_fig, use_container_width=True)
