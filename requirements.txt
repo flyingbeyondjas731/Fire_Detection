@@ -1,13 +1,5 @@
 streamlit
+numpy
 joblib
 gdown
 scikit-learn
-pandas
-numpy
-matplotlib
-seaborn
-folium
-streamlit
-numpy
-scikit-learn==1.2.2
-joblib==1.2.0
