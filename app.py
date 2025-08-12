@@ -52,6 +52,48 @@ else:
     </style>
     """
     st.markdown(page_bg_img, unsafe_allow_html=True)
+    # ====== Custom CSS for white & colorful text ======
+custom_text_styles = """
+<style>
+/* Make all labels white */
+label, .stSelectbox label, .stNumberInput label, .stRadio label {
+    color: white !important;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+/* Change input box text color */
+input, select, textarea {
+    color: white !important;
+    background-color: rgba(0,0,0,0.4) !important;
+}
+
+/* Change placeholder text color */
+.stSelectbox div[role="listbox"], .stNumberInput input {
+    color: white !important;
+}
+
+/* Title & description styles */
+h1, h2, h3, h4, h5, h6, p {
+    color: white !important;
+}
+
+/* Button styling */
+.stButton button {
+    background-color: rgba(255,69,0,0.9);
+    color: white;
+    font-weight: bold;
+    border-radius: 8px;
+    border: none;
+}
+.stButton button:hover {
+    background-color: rgba(255,140,0,0.9);
+    color: black;
+}
+</style>
+"""
+st.markdown(custom_text_styles, unsafe_allow_html=True)
+
 
 # ====== Title ======
 st.markdown("<h1 style='color:white;text-align:center;'>🔥 Fire Type Classification 🔥</h1>", unsafe_allow_html=True)
@@ -125,3 +167,4 @@ if st.button("Predict Fire Type"):
     ))
     gauge.update_layout(template="plotly_dark")
     st.plotly_chart(gauge, use_container_width=True)
+
