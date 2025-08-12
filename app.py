@@ -3,90 +3,119 @@ import numpy as np
 import joblib
 import gdown
 import os
+import plotly.graph_objects as go
+from datetime import datetime
 
-# ====== PAGE CONFIG ======
-st.set_page_config(
-    page_title="🔥 Fire Type Classifier",
-    page_icon="🔥",
-    layout="centered"
-)
-
-# ====== HEADER ======
-st.title("🔥 Fire Type Classification")
-st.markdown(
-    """
+# ===================== CUSTOM CSS =====================
+st.markdown("""
     <style>
-    .big-font { font-size:22px !important; font-weight: bold; }
+        body {
+            background: linear-gradient(135deg, #e3f2fd, #fce4ec);
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .main {
+            padding: 2rem;
+            border-radius: 20px;
+        }
+        .stButton>button {
+            background-color: #42a5f5;
+            color: white;
+            border-radius: 12px;
+            padding: 0.6em 1.5em;
+            font-size: 1rem;
+            border: none;
+        }
+        .stButton>button:hover {
+            background-color: #1e88e5;
+        }
+        .prediction-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
     </style>
-    """,
-    unsafe_allow_html=True
-)
-st.markdown('<p class="big-font">Predict fire type from MODIS satellite readings</p>', unsafe_allow_html=True)
-st.write("---")
+""", unsafe_allow_html=True)
 
-# ====== Download model from Google Drive ======
+# ===================== MODEL LOADING =====================
 file_id = "1K-CkomnFCIaZVmTCCGRVR1wG75_54EZU"
 model_filename = "best_fire_detection_model.pkl"
 
 if not os.path.exists(model_filename):
-    with st.spinner("⏳ Downloading model from Google Drive... Please wait"):
-        gdown.download(f"https://drive.google.com/uc?id={file_id}", model_filename, quiet=False)
-    st.success("✅ Model downloaded successfully!")
+    st.write("📥 Downloading model from Google Drive...")
+    gdown.download(f"https://drive.google.com/uc?id={file_id}", model_filename, quiet=False)
 
-# ====== Load model & scaler ======
 model = joblib.load(model_filename)
-scaler = joblib.load("scaler.pkl")  # Ensure this file is in the project
+scaler = joblib.load("scaler.pkl")
 
-# ====== SIDEBAR INFO ======
-st.sidebar.header("ℹ️ About the App")
-st.sidebar.write("""
-This app uses a trained ML model to predict fire types based on MODIS satellite readings.  
-**Model Inputs:**
-- Brightness  
-- Brightness T31  
-- Fire Radiative Power (FRP)  
-- Scan & Track  
-- Confidence Level
-""")
-st.sidebar.info("Created with ❤️ using Streamlit")
+# ===================== APP CONFIG =====================
+st.set_page_config(page_title="🔥 Fire Type Classifier", layout="wide")
+st.title("🔥 Fire Type Classification Dashboard")
+st.markdown("A stylish, interactive tool to predict **fire type** from MODIS satellite readings.")
 
-# ====== INPUT FORM ======
-with st.form(key="fire_form"):
-    col1, col2 = st.columns(2)
-    with col1:
-        brightness = st.number_input("🌞 Brightness", value=300.0, min_value=200.0, max_value=500.0, step=0.5)
-        frp = st.number_input("🔥 Fire Radiative Power (FRP)", value=15.0, min_value=0.0, max_value=500.0, step=0.1)
-        confidence = st.selectbox("📊 Confidence Level", ["low", "nominal", "high"])
-    with col2:
-        bright_t31 = st.number_input("🌡 Brightness T31", value=290.0, min_value=200.0, max_value=350.0, step=0.5)
-        scan = st.number_input("📏 Scan", value=1.0, min_value=0.1, max_value=5.0, step=0.1)
-        track = st.number_input("🛤 Track", value=1.0, min_value=0.1, max_value=5.0, step=0.1)
+# ===================== PRESET DATA =====================
+example_inputs = {
+    "Vegetation Fire": [320, 300, 25, 1.2, 1.1, "nominal"],
+    "Other Static Land Source": [290, 280, 5, 1.0, 1.0, "low"],
+    "Offshore Fire": [310, 295, 40, 1.5, 1.3, "high"]
+}
 
-    submit_button = st.form_submit_button("🔍 Predict Fire Type")
+logs = []
 
-# ====== PREDICTION ======
-if submit_button:
-    confidence_map = {"low": 0, "nominal": 1, "high": 2}
-    confidence_val = confidence_map[confidence]
+# ===================== SIDEBAR PRESETS =====================
+st.sidebar.header("⚡ Quick Presets")
+preset_choice = st.sidebar.selectbox("Choose Example", ["Custom"] + list(example_inputs.keys()))
+if preset_choice != "Custom":
+    brightness, bright_t31, frp, scan, track, confidence = example_inputs[preset_choice]
+else:
+    brightness, bright_t31, frp, scan, track, confidence = 300.0, 290.0, 15.0, 1.0, 1.0, "nominal"
 
-    input_data = np.array([[brightness, bright_t31, frp, scan, track, confidence_val]])
+# ===================== USER INPUT =====================
+confidence_map = {"low": 0, "nominal": 1, "high": 2}
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    brightness = st.number_input("Brightness", value=brightness)
+    frp = st.number_input("FRP (Fire Radiative Power)", value=frp)
+with col2:
+    bright_t31 = st.number_input("Brightness T31", value=bright_t31)
+    scan = st.number_input("Scan", value=scan)
+with col3:
+    track = st.number_input("Track", value=track)
+    confidence = st.selectbox("Confidence Level", ["low", "nominal", "high"], index=list(confidence_map.keys()).index(confidence))
+
+# ===================== PREDICTION =====================
+if st.button("🚀 Predict Fire Type"):
+    input_data = np.array([[brightness, bright_t31, frp, scan, track, confidence_map[confidence]]])
     scaled_input = scaler.transform(input_data)
-
     prediction = model.predict(scaled_input)[0]
-    fire_types = {
-        0: "🌿 Vegetation Fire",
-        2: "🏭 Other Static Land Source",
-        3: "🌊 Offshore Fire"
-    }
+    fire_types = {0: "🌿 Vegetation Fire", 2: "🏭 Other Static Land Source", 3: "🌊 Offshore Fire"}
     result = fire_types.get(prediction, "❓ Unknown")
 
-    # ====== RESULT DISPLAY ======
-    st.subheader("📌 Prediction Result")
-    st.success(f"**Predicted Fire Type:** {result}")
+    # Log entry
+    logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] Predicted: {result} | Inputs: {list(input_data[0])}")
 
-    if "Vegetation" in result:
-        st.info("🌱 Likely vegetation or forest fire detected.")
-    elif "Offshore" in result:
-        st.warning("🌊 Possible offshore fire detected — marine monitoring recommended.")
-    else:
-        st.error("🏭 Fire detected from other land-based sources.")
+    # Show prediction card
+    st.markdown(f"<div class='prediction-card'><h3>Predicted Fire Type: {result}</h3></div>", unsafe_allow_html=True)
+
+    # Radar Chart
+    categories = ["Brightness", "Brightness T31", "FRP", "Scan", "Track", "Confidence"]
+    values = [brightness, bright_t31, frp, scan, track, confidence_map[confidence]]
+    fig_radar = go.Figure(data=go.Scatterpolar(r=values + [values[0]], theta=categories + [categories[0]], fill='toself', name='Your Input'))
+    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True)), showlegend=False, height=400)
+    st.plotly_chart(fig_radar, use_container_width=True)
+
+    # Gauge Chart for FRP
+    fig_gauge = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=frp,
+        title={'text': "FRP Intensity"},
+        gauge={'axis': {'range': [0, 100]}}
+    ))
+    fig_gauge.update_layout(height=300)
+    st.plotly_chart(fig_gauge, use_container_width=True)
+
+# ===================== LOGS PANEL =====================
+with st.expander("📜 Prediction Logs"):
+    for log in logs:
+        st.write(log)
